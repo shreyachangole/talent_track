@@ -3,4 +3,6 @@ node_modules/.package-lock.json
 venv/
 .vscode/
 .idea/
+# Environment variables
+**/.env
 
