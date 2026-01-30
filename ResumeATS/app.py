@@ -1,126 +1,177 @@
 import os
-import streamlit as st
-import pdf2image
-import io
 import json
-import base64
-import google.generativeai as genai
+import requests
+import streamlit as st
+import pdfplumber
 from dotenv import load_dotenv
-
-# Load environment variables from .env file
+# -----------------------------
+# ENV SETUP
+# -----------------------------
 load_dotenv()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# Configure Google Generative AI with the API key from .env
-genai.configure(api_key=os.getenv('API_KEY'))
+if not GROQ_API_KEY:
+    st.error("GROQ_API_KEY not loaded. Check your .env file.")
+    st.stop()
 
-# Define the poppler path - UPDATE THIS TO YOUR ACTUAL PATH
-POPPLER_PATH = r"C:\Users\ASUS\Downloads\Release-25.12.0-0.zip\poppler-25.12.0\Library\bin"
+# -----------------------------
+# GROQ CONFIG
+# -----------------------------
+GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
 
-# Define cached functions
-@st.cache_data()
-def get_gemini_response(input, pdf_content, prompt):
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    response = model.generate_content([input, pdf_content[0], prompt])
-    return response.text
+GROQ_MODELS = [
+    "llama-3.1-8b-instant",
+    "mixtral-8x7b-32768",
+    "gemma2-9b-it"
+]
 
-@st.cache_data()
-def get_gemini_response_keywords(input, pdf_content, prompt):
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    response = model.generate_content([input, pdf_content[0], prompt])
-    return json.loads(response.text[8:-4])
+def call_groq(prompt, max_tokens=1200):
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
 
-@st.cache_data()
-def input_pdf_setup(uploaded_file):
-    if uploaded_file is not None:
-        # Add poppler_path parameter
-        images = pdf2image.convert_from_bytes(
-            uploaded_file.read(),
-            poppler_path=POPPLER_PATH  # Add this line
-        )
-        first_page = images[0]
-        img_byte_arr = io.BytesIO()
-        first_page.save(img_byte_arr, format='JPEG')
-        img_byte_arr = img_byte_arr.getvalue()
-        pdf_parts = [
-            {
-                "mime_type": "image/jpeg",
-                "data": base64.b64encode(img_byte_arr).decode()
-            }
-        ]
-        return pdf_parts
-    else:
-        raise FileNotFoundError("No file uploaded")
+    last_error = None
 
-# Streamlit App
+    for model in GROQ_MODELS:
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.6,
+            "max_tokens": max_tokens
+        }
+
+        try:
+            response = requests.post(
+                GROQ_ENDPOINT,
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                return response.json()["choices"][0]["message"]["content"]
+
+            if response.status_code == 400 and "decommissioned" in response.text:
+                last_error = response.text
+                continue
+
+            last_error = response.text
+
+        except Exception as e:
+            last_error = str(e)
+
+    raise RuntimeError(f"Groq API failed. Last error: {last_error}")
+
+# -----------------------------
+# PDF TEXT EXTRACTION
+# -----------------------------
+def extract_resume_text(uploaded_file):
+    text = ""
+    with pdfplumber.open(uploaded_file) as pdf:
+        for page in pdf.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+    return text.strip()
+
+# -----------------------------
+# STREAMLIT UI
+# -----------------------------
 st.set_page_config(page_title="ATS Resume Scanner")
-st.header("Application Tracking System")
-input_text = st.text_area("Job Description: ", key="input")
-uploaded_file = st.file_uploader("Upload your resume(PDF)...", type=["pdf"])
+st.title("ATS Resume Scanner")
 
-if 'resume' not in st.session_state:
-    st.session_state.resume = None
+job_description = st.text_area("Job Description", height=160)
+resume_file = st.file_uploader("Upload Resume (PDF)", type=["pdf"])
 
-if uploaded_file is not None:
-    st.write("PDF Uploaded Successfully")
-    st.session_state.resume = uploaded_file
+analyze = st.button("Analyze Resume")
+keywords = st.button("Extract Keywords")
+match = st.button("Match Percentage")
 
-col1, col2, col3 = st.columns(3, gap="medium")
-
-with col1:
-    submit1 = st.button("Tell Me About the Resume")
-
-with col2:
-    submit2 = st.button("Get Keywords")
-
-with col3:
-    submit3 = st.button("Percentage match")
-
-input_prompt1 = """
- You are an experienced Technical Human Resource Manager, your task is to review the provided resume against the job description. 
- Please share your professional evaluation on whether the candidate's profile aligns with the role. 
- Highlight the strengths and weaknesses of the applicant in relation to the specified job requirements.
+# -----------------------------
+# PROMPTS
+# -----------------------------
+ANALYZE_PROMPT = """
+Analyze the resume against the job description.
+Return strengths, weaknesses, and improvement suggestions.
 """
 
-input_prompt2 = """
-As an expert ATS (Applicant Tracking System) scanner with an in-depth understanding of AI and ATS functionality, 
-your task is to evaluate a resume against a provided job description. Please identify the specific skills and keywords 
-necessary to maximize the impact of the resume and provide response in json format as {Technical Skills:[], Analytical Skills:[], Soft Skills:[]}.
-
-Note: Please do not make up the answer, only answer from the job description provided.
+KEYWORDS_PROMPT = """
+Extract skills in JSON:
+{
+  "Technical Skills": [],
+  "Analytical Skills": [],
+  "Soft Skills": []
+}
+Only include skills mentioned in the job description.
 """
 
-input_prompt3 = """
-You are a skilled ATS (Applicant Tracking System) scanner with a deep understanding of data science and ATS functionality, 
-your task is to evaluate the resume against the provided job description. Give me the percentage of match if the resume matches
-the job description. First the output should come as percentage and then keywords missing and last final thoughts.
+MATCH_PROMPT = """
+Give:
+1. Match percentage
+2. Missing keywords
+3. Final recommendation
 """
 
-if submit1:
-    if st.session_state.resume is not None:
-        pdf_content = input_pdf_setup(st.session_state.resume)
-        response = get_gemini_response(input_prompt1, pdf_content, input_text)
-        st.subheader("The Response is")
-        st.write(response)
-    else:
-        st.write("Please upload the resume")
+# -----------------------------
+# ACTIONS
+# -----------------------------
+if resume_file and job_description:
 
-elif submit2:
-    if st.session_state.resume is not None:
-        pdf_content = input_pdf_setup(st.session_state.resume)
-        response = get_gemini_response_keywords(input_prompt2, pdf_content, input_text)
-        st.subheader("Skills are:")
-        if response is not None:
-            st.write(f"Technical Skills: {', '.join(response['Technical Skills'])}.")
-            st.write(f"Analytical Skills: {', '.join(response['Analytical Skills'])}.")
-            st.write(f"Soft Skills: {', '.join(response['Soft Skills'])}.")
-    else:
-        st.write("Please upload the resume")
+    resume_text = extract_resume_text(resume_file)
 
-elif submit3:
-    if st.session_state.resume is not None:
-        pdf_content = input_pdf_setup(st.session_state.resume)
-        response = get_gemini_response(input_prompt3, pdf_content, input_text)
-        st.subheader("The Response is")
-        st.write(response)
-    else:
-        st.write("Please upload the resume")
+    if not resume_text:
+        st.error("Could not extract text from resume PDF.")
+        st.stop()
+
+    # Safety: limit resume size
+    resume_text = resume_text[:8000]
+
+    if analyze:
+        with st.spinner("Analyzing resume..."):
+            prompt = f"""
+JOB DESCRIPTION:
+{job_description}
+
+RESUME:
+{resume_text}
+
+TASK:
+{ANALYZE_PROMPT}
+"""
+            st.write(call_groq(prompt))
+
+    if keywords:
+        with st.spinner("Extracting keywords..."):
+            prompt = f"""
+JOB DESCRIPTION:
+{job_description}
+
+RESUME:
+{resume_text}
+
+TASK:
+{KEYWORDS_PROMPT}
+"""
+            output = call_groq(prompt)
+            try:
+                st.json(json.loads(output))
+            except:
+                st.write(output)
+
+    if match:
+        with st.spinner("Calculating match..."):
+            prompt = f"""
+JOB DESCRIPTION:
+{job_description}
+
+RESUME:
+{resume_text}
+
+TASK:
+{MATCH_PROMPT}
+"""
+            st.write(call_groq(prompt))
+
+elif analyze or keywords or match:
+    st.warning("Upload resume and add job description first.")
