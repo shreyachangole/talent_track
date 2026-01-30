@@ -1,350 +1,305 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Student Dashboard</title>
+  <title>Student Pro-Portal | EduStream</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
-    /* CSS styles go here */
+    :root {
+      --primary: #4e73df;
+      --secondary: #1cc88a;
+      --dark-blue: #0C1969;
+      --light-bg: #f8f9fc;
+      --white: #ffffff;
+      --gradient: linear-gradient(135deg, #0C1969 0%, #29378c 100%);
+    }
+
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
+      font-family: 'Poppins', sans-serif;
+      background-color: var(--light-bg);
       display: flex;
       height: 100vh;
+      overflow: hidden;
     }
 
-    .dashboard {
-      display: flex;
-      width: 100%;
-      height: 100%;
-    }
-
+    /* Sidebar Enhancement */
     .sidebar {
-      width: 250px;
-      background-color: #0C1969;
+      width: 280px;
+      background: var(--gradient);
       color: white;
       padding: 20px;
-      height: 100%;
+      box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+      z-index: 10;
     }
 
     .sidebar h2 {
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 30px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 15px;
     }
 
-    .sidebar ul {
-      list-style: none;
-      padding: 0;
-    }
-
-    .sidebar ul li {
-      margin-bottom: 15px;
-    }
+    .sidebar ul { list-style: none; padding: 0; }
+    .sidebar ul li { margin-bottom: 8px; }
 
     .sidebar ul li a {
-      color: white;
+      color: rgba(255,255,255,0.7);
       text-decoration: none;
-      font-size: 18px;
+      padding: 12px 20px;
       display: block;
-      padding: 10px;
-      border-radius: 5px;
-      transition: background-color 0.3s;
+      border-radius: 10px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .sidebar ul li a:hover {
-      background-color: #29378c;
+    .sidebar ul li a:hover, .sidebar ul li a.active {
+      background: rgba(255,255,255,0.15);
+      color: white;
+      transform: translateX(8px);
     }
 
+    /* Main Layout */
     .main-content {
       flex-grow: 1;
+      overflow-y: auto;
+      padding: 30px;
+    }
+
+    .header-flex {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    /* Metric Cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: var(--white);
       padding: 20px;
-      background-color: #ecf0f1;
+      border-radius: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      border-left: 5px solid var(--primary);
+      transition: transform 0.3s;
     }
 
-    .main-content h1 {
-      margin-top: 0;
-    }
+    .stat-card:hover { transform: translateY(-5px); }
+    .stat-card h4 { margin: 0; color: #858796; font-size: 0.8rem; text-transform: uppercase; }
+    .stat-card .value { font-size: 1.5rem; font-weight: 600; color: #5a5c69; }
 
+    /* Content Area */
     #content {
-      margin-top: 20px;
-      padding: 20px;
-      background-color: white;
-      border-radius: 5px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      background: var(--white);
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+      min-height: 400px;
+      animation: slideUp 0.5s ease-out;
     }
 
-    .form-group {
-      margin-bottom: 15px;
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    .form-group label {
-      display: block;
-      margin-bottom: 5px;
-    }
-
-    .form-group input {
-      width: 60%;
-      padding: 10px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
-
-    .form-actions {
-      margin-top: 20px;
-    }
-
-    .form-actions button {
-      padding: 10px 20px;
-      background-color: #0f776d;
+    .action-btn {
+      background: var(--gradient);
       color: white;
       border: none;
-      border-radius: 5px;
+      padding: 12px 25px;
+      border-radius: 8px;
       cursor: pointer;
+      font-weight: 500;
+      box-shadow: 0 4px 15px rgba(12, 25, 105, 0.2);
+      transition: 0.3s;
     }
 
-    .form-actions button:hover {
-      background-color: #0f776d;
+    .action-btn:hover {
+      box-shadow: 0 6px 20px rgba(12, 25, 105, 0.4);
+      filter: brightness(1.2);
     }
 
-    .button-container {
-      margin: 0rem 0rem 2.5rem 7rem;
+    .progress-container {
+      background: #eaecf4;
+      border-radius: 10px;
+      height: 10px;
+      margin: 10px 0;
+    }
+    .progress-bar {
+      background: var(--secondary);
       height: 100%;
-    }
-
-    .btn {
-      border: 1px solid #000;
-      background-color: transparent;
-      color: #000;
-      padding: 10px 20px;
-      border-radius: 5px;
-      cursor: pointer;
-      text-decoration: none;
-    }
-
-    .btn:hover {
-      background-color: #000;
-      color: #fff;
-    }
-
-    .btn a {
-      text-decoration: none;
-      color: inherit;
-    }
-
-    .btn a:hover {
-      color: inherit;
-    }
-
-    .announcement {
-      margin-bottom: 20px;
-    }
-
-    .announcement h3 {
-      margin-bottom: 10px;
-    }
-
-    .announcement p {
-      font-size: 16px;
-      line-height: 1.5;
-    }
-
-    .announcement small {
-      color: #777;
+      border-radius: 10px;
+      transition: width 1s ease-in-out;
     }
   </style>
 </head>
-
 <body>
-  <div class="dashboard">
-    <div class="sidebar">
-      <h2>Student Portal</h2>
-      <ul>
-        <li><a href="#" id="dashboard">Dashboard</a></li>
-        <li><a href="#" id="aptitude">Aptitude</a></li>
-        <li><a href="#" id="tech">DSA Practice</a></li>
-        <li><a href="#" id="Mockinterview">Mock-Interview</a></li>
-        <li><a href="#" id="resume">Resume Builder</a></li>
-        <li><a href="#" id="resumeats">Resume Scanner</a></li>
-        <li><a href="#" id="announcements">Announcements</a></li>
-        <li><a href="#" id="profile">Profile</a></li>
-        <li><a href="#" id="logout">Logout</a></li>
-      </ul>
+
+  <nav class="sidebar">
+    <h2>EduStream</h2>
+    <ul id="menu">
+      <li><a href="#" data-page="dash" class="active">🏠 Dashboard</a></li>
+      <li><a href="#" data-page="apt">🧠 Aptitude</a></li>
+      <li><a href="#" data-page="dsa">💻 DSA Practice</a></li>
+      <li><a href="#" data-page="mock">🎙️ Mock Interview</a></li>
+      <li><a href="#" data-page="res">📄 Resume Builder</a></li>
+      <li><a href="#" data-page="ats">🔍 ATS Scanner</a></li>
+      <li><a href="#" data-page="ann">🔔 Announcements</a></li>
+      <li><a href="#" data-page="prof">👤 Profile</a></li>
+      <li><a href="#" id="logoutBtn" style="color: #ffb8b8; margin-top: 20px;">🚪 Logout</a></li>
+    </ul>
+  </nav>
+
+  <main class="main-content">
+    <div class="header-flex">
+      <h1>Hello, <span id="userGreeting" style="color: var(--dark-blue);">Explorer</span>! 👋</h1>
+      <div id="dateDisplay" style="font-weight: 500; color: #858796;"></div>
     </div>
 
-    <div class="main-content">
-      <h1>Welcome, <span id="fullName">Student</span></h1>
-      <div id="content">
-        <p>Select an option from the sidebar to view more details.</p>
+    <div class="stats-grid">
+      <div class="stat-card" style="border-left-color: #4e73df;">
+        <h4>Aptitude Score</h4>
+        <div class="value">85%</div>
+      </div>
+      <div class="stat-card" style="border-left-color: #1cc88a;">
+        <h4>Problems Solved</h4>
+        <div class="value">124</div>
+      </div>
+      <div class="stat-card" style="border-left-color: #f6c23e;">
+        <h4>Interview Readiness</h4>
+        <div class="value">Good</div>
       </div>
     </div>
-  </div>
+
+    <div id="content">
+      <h2>Welcome Back!</h2>
+      <p>You've completed 70% of your weekly goals. Keep it up!</p>
+      <div class="progress-container"><div class="progress-bar" style="width: 70%"></div></div>
+    </div>
+  </main>
 
   <script>
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', () => {
       const content = document.getElementById('content');
+      const userGreeting = document.getElementById('userGreeting');
+      
+      const updateHeader = () => {
+        const userName = localStorage.getItem('fullName') || 'Student';
+        userGreeting.textContent = userName;
+        document.getElementById('dateDisplay').textContent = new Date().toDateString();
+      };
+      updateHeader();
 
-      // Fetch the full name from localStorage
-      const fullName = localStorage.getItem('fullName');
-      if (fullName) {
-        document.getElementById('fullName').textContent = fullName;
-      }
-
-      // Dashboard Section
-      document.getElementById('dashboard').addEventListener('click', function () {
-        content.innerHTML =
-          '<h2>Dashboard</h2><p>Welcome to your dashboard. Here you will find an overview of your activities and performance.</p>';
-      });
-
-      // Aptitude Section with two inner buttons
-      document.getElementById('aptitude').addEventListener('click', function (event) {
-        event.preventDefault();
-        content.innerHTML = `
-            <h2>Aptitude Options</h2>
-            <button id="quizButton" class="btn">Aptitude Quiz</button>
-            <button id="dashboardButton" class="btn">Result Analysis & Visualization</button>
-          `;
-        document.getElementById('quizButton').addEventListener('click', function () {
-          window.location.href = 'http://localhost:8501';
-        });
-        document.getElementById('dashboardButton').addEventListener('click', function () {
-          window.location.href = 'http://localhost:8502';
-        });
-      });
-
-      // MOckinterview
-      document.getElementById('Mockinterview').addEventListener('click', function (event) {
-        event.preventDefault();
-        content.innerHTML = `
-            <h2>Mock Interview</h2>
-            <button id="interButton" class="btn">Start Interview</button>
-             `;
-        document.getElementById('interButton').addEventListener('click', function () {
-          window.location.href = 'http://localhost:8505';
-        });
-      });
-
-      // Resume Builder Section
-      document.getElementById('resume').addEventListener('click', function () {
-        content.innerHTML = `
-            <h2>Resume</h2>
-            <p>Create Your Professional Resume With Resume Builder</p>
-            <div class="row">
-              <div class="button-container">
-                <button type="button" class="btn">
-                  <a href="Form.html">Create Your Resume</a>
-                </button>
-              </div>
+      const pages = {
+        dash: () => `
+          <h2>Daily Roadmap</h2>
+          <p>Today's focus: <b>Dynamic Programming</b> and <b>Logical Reasoning</b>.</p>
+          <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="action-btn" onclick="alert('Starting Daily Challenge...')">Start Daily Challenge</button>
+          </div>
+        `,
+        apt: () => `
+          <h2>Aptitude Lab</h2>
+          <p>Sharpen your mind with quantitative and verbal tests.</p>
+          <div style="display:flex; gap:15px; margin-top:20px;">
+             <button class="action-btn" onclick="window.location.href='http://localhost:8501'">Launch Quiz</button>
+             <button class="action-btn" style="background:var(--secondary)" onclick="window.location.href='http://localhost:8502'">View Analytics</button>
+          </div>
+        `,
+        dsa: () => `
+          <h2>DSA Master</h2>
+          <p>Master Data Structures with our interactive compiler.</p>
+          <div style="display:flex; gap:15px; margin-top:20px;">
+             <button class="action-btn" onclick="window.location.href='http://localhost:8503'">Code Now</button>
+             <button class="action-btn" style="background:#36b9cc" onclick="window.location.href='http://localhost:8504'">Performance Hub</button>
+          </div>
+        `,
+        mock: () => `
+          <h2>AI Mock Interview</h2>
+          <p>Record your responses and get instant AI feedback on your body language and content.</p>
+          <button class="action-btn" onclick="window.location.href='http://localhost:8505'">Enter Virtual Room</button>
+        `,
+        res: () => `
+          <h2>Smart Resume Builder</h2>
+          <p>Build a resume that recruiters love using high-conversion templates.</p>
+          <button class="action-btn" onclick="window.location.href='Form.html'">Create My Resume</button>
+        `,
+        ats: () => `
+          <h2>ATS Scanner</h2>
+          <p>Upload your PDF to see how an Applicant Tracking System reads your resume.</p>
+          <button class="action-btn" onclick="window.location.href='http://localhost:8506'">Scan Document</button>
+        `,
+        ann: () => {
+          content.innerHTML = '<h2>Recent Updates</h2><p>Fetching the latest news...</p>';
+          fetch('http://localhost:3000/announcements')
+            .then(r => r.json())
+            .then(data => {
+              if (data.length > 0) {
+                content.innerHTML = '<h2>Recent Updates</h2>' + data.map(a => `
+                  <div style="padding:15px; border-bottom:1px solid #eee">
+                    <h4 style="margin:0">${a.title}</h4>
+                    <p style="font-size:0.9rem; color:#666">${a.content}</p>
+                  </div>
+                `).join('');
+              } else {
+                content.innerHTML = '<h2>Recent Updates</h2><p>No new announcements.</p>';
+              }
+            }).catch(() => content.innerHTML = '<h2>Recent Updates</h2><p>Connect your backend to see live announcements!</p>');
+        },
+        prof: () => {
+          const name = localStorage.getItem('fullName') || 'Student';
+          return `
+            <h2>Profile Settings</h2>
+            <div style="max-width: 400px;">
+                <label style="display:block; margin-bottom:8px; font-size:0.9rem;">Full Name</label>
+                <input type="text" id="upName" value="${name}" style="padding:12px; width:100%; border:1px solid #ddd; border-radius:8px; margin-bottom:20px;">
+                <button class="action-btn" onclick="saveProfile()">Save Changes</button>
             </div>
           `;
+        }
+      };
+
+      // Navigation handler
+      document.getElementById('menu').addEventListener('click', (e) => {
+        const link = e.target.closest('a');
+        if (!link || link.id === 'logoutBtn') return;
+        
+        e.preventDefault();
+        document.querySelectorAll('#menu a').forEach(a => a.classList.remove('active'));
+        link.classList.add('active');
+        
+        const page = link.getAttribute('data-page');
+        if(pages[page]) {
+            const result = pages[page]();
+            if (result) content.innerHTML = result;
+        }
       });
 
-      // Resume Scanner Section
-      document.getElementById('resumeats').addEventListener('click', function () {
-        content.innerHTML = `
-            <h2>Resume</h2>
-            <p>Check if your Resume is Job Ready</p>
-            <div class="row">
-              <div class="button-container">
-                <button type="button" class="btn">
-                  <a href="http://localhost:8506">Start ATS Scan</a>
-                </button>
-              </div>
-            </div>
-          `;
-      });
-
-      // Announcements Section with fetch request
-      document.getElementById('announcements').addEventListener('click', function () {
-        content.innerHTML = '<h2>Announcements</h2><p>Loading announcements...</p>';
-        fetch('http://localhost:3000/announcements')
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.length > 0) {
-              let announcementsHtml = '';
-              data.forEach((announcement) => {
-                announcementsHtml += `
-                    <div class="announcement">
-                      <h3>${announcement.title}</h3>
-                      <p>${announcement.content}</p>
-                      <p><small>Published on: ${new Date(announcement.createdAt).toLocaleString()}</small></p>
-                    </div>
-                    <hr/>
-                  `;
-              });
-              content.innerHTML = `<h2>Announcements</h2>${announcementsHtml}`;
-            } else {
-              content.innerHTML = '<h2>Announcements</h2><p>No announcements available.</p>';
-            }
-          })
-          .catch((error) => {
-            content.innerHTML = '<h2>Announcements</h2><p>Failed to load announcements. Please try again later.</p>';
-          });
-      });
-
-      // Profile Section
-      document.getElementById('profile').addEventListener('click', function () {
-        const storedFullName = localStorage.getItem('fullName') || '';
-        const storedEmail = localStorage.getItem('email') || '';
-        content.innerHTML = `
-            <h2>Profile</h2>
-            <form id="profileForm">
-              <div class="form-group">
-                <label for="fullNameInput">Full Name</label>
-                <input type="text" id="fullNameInput" value="${storedFullName}" />
-              </div>
-              <div class="form-group">
-                <label for="emailInput">Email</label>
-                <input type="email" id="emailInput" value="${storedEmail}" />
-              </div>
-              <div class="form-group">
-                <label for="passwordInput">Password</label>
-                <input type="password" id="passwordInput" placeholder="Enter new password" />
-              </div>
-              <div class="form-actions">
-                <button type="submit">Save Changes</button>
-              </div>
-            </form>
-          `;
-        document.getElementById('profileForm').addEventListener('submit', function (event) {
-          event.preventDefault();
-          const newFullName = document.getElementById('fullNameInput').value;
-          const newEmail = document.getElementById('emailInput').value;
-          const newPassword = document.getElementById('passwordInput').value;
-          localStorage.setItem('fullName', newFullName);
-          localStorage.setItem('email', newEmail);
-          if (newPassword) {
-            localStorage.setItem('password', newPassword);
-          }
-          document.getElementById('fullName').textContent = newFullName;
-          content.innerHTML = '<p>Your profile has been updated successfully!</p>';
-        });
-      });
-
-      // Logout Section
-      document.getElementById('logout').addEventListener('click', function () {
-        localStorage.clear();
-        window.location.href = 'student-login.html';
-      });
-
-      // DSA Practice Section with two inner buttons for DSA_app.py and DSA_dash.py
-      document.getElementById('tech').addEventListener('click', function (event) {
-        event.preventDefault();
-        content.innerHTML = `
-            <h2>DSA Practice Options</h2>
-            <button id="dsaQuestionsButton" class="btn">DSA Questions</button>
-            <button id="dsaAnalysisButton" class="btn">DSA Analysis</button>
-          `;
-        document.getElementById('dsaQuestionsButton').addEventListener('click', function () {
-          window.location.href = 'http://localhost:8503';
-        });
-        document.getElementById('dsaAnalysisButton').addEventListener('click', function () {
-          window.location.href = 'http://localhost:8504';
-        });
+      document.getElementById('logoutBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        if(confirm('Are you sure you want to logout?')) {
+            localStorage.clear();
+            window.location.href = 'student-login.html';
+        }
       });
     });
+
+    function saveProfile() {
+      const name = document.getElementById('upName').value;
+      localStorage.setItem('fullName', name);
+      alert('Profile saved!');
+      location.reload();
+    }
   </script>
 </body>
-
 </html>
