@@ -13,6 +13,9 @@ load_dotenv()
 # Configure Google Generative AI with the API key from .env
 genai.configure(api_key=os.getenv('API_KEY'))
 
+# Define the poppler path - UPDATE THIS TO YOUR ACTUAL PATH
+POPPLER_PATH = r"C:\Users\ASUS\Downloads\Release-25.12.0-0.zip\poppler-25.12.0\Library\bin"
+
 # Define cached functions
 @st.cache_data()
 def get_gemini_response(input, pdf_content, prompt):
@@ -29,7 +32,11 @@ def get_gemini_response_keywords(input, pdf_content, prompt):
 @st.cache_data()
 def input_pdf_setup(uploaded_file):
     if uploaded_file is not None:
-        images = pdf2image.convert_from_bytes(uploaded_file.read())
+        # Add poppler_path parameter
+        images = pdf2image.convert_from_bytes(
+            uploaded_file.read(),
+            poppler_path=POPPLER_PATH  # Add this line
+        )
         first_page = images[0]
         img_byte_arr = io.BytesIO()
         first_page.save(img_byte_arr, format='JPEG')
