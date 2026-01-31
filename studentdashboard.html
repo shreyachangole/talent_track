@@ -122,6 +122,7 @@
       font-weight: 500;
       box-shadow: 0 4px 15px rgba(12, 25, 105, 0.2);
       transition: 0.3s;
+      margin-top: 5px;
     }
 
     .action-btn:hover {
@@ -139,7 +140,22 @@
       background: var(--secondary);
       height: 100%;
       border-radius: 10px;
-      transition: width 1s ease-in-out;
+      transition: width 0.5s ease-in-out;
+    }
+
+    /* Roadmap Step Styling */
+    .roadmap-step {
+        display: flex;
+        align-items: center;
+        padding: 15px;
+        background: #f8f9fc;
+        border-radius: 12px;
+        margin-bottom: 10px;
+        border: 1px solid #eee;
+        transition: 0.3s;
+    }
+    .roadmap-step:hover {
+        border-color: var(--primary);
     }
   </style>
 </head>
@@ -182,10 +198,7 @@
     </div>
 
     <div id="content">
-      <h2>Welcome Back!</h2>
-      <p>You've completed 70% of your weekly goals. Keep it up!</p>
-      <div class="progress-container"><div class="progress-bar" style="width: 70%"></div></div>
-    </div>
+        </div>
   </main>
 
   <script>
@@ -200,14 +213,70 @@
       };
       updateHeader();
 
+      // Hardcoded Roadmaps
+      const roadmaps = {
+        webdev: {
+          title: "Web Development",
+          steps: ["HTML5, CSS3 & Flexbox/Grid", "JavaScript Fundamentals & ES6+", "React.js Framework", "Node.js & Express Backend", "Database Management (SQL/NoSQL)"]
+        },
+        ds: {
+          title: "Data Science",
+          steps: ["Python Programming Basics", "Statistics & Linear Algebra", "Pandas & NumPy for Data Analysis", "Exploratory Data Analysis (EDA)", "Machine Learning Model Building"]
+        },
+        aiml: {
+          title: "AI & Machine Learning",
+          steps: ["Mathematics for AI (Calculus/Prob)", "Supervised & Unsupervised Learning", "Neural Networks & Deep Learning", "Natural Language Processing (NLP)", "AI Model Deployment (API)"]
+        }
+      };
+
       const pages = {
-        dash: () => `
-          <h2>Daily Roadmap</h2>
-          <p>Today's focus: <b>Dynamic Programming</b> and <b>Logical Reasoning</b>.</p>
-          <div style="display:flex; gap:10px; margin-top:20px;">
-            <button class="action-btn" onclick="alert('Starting Daily Challenge...')">Start Daily Challenge</button>
-          </div>
-        `,
+        dash: () => {
+          const selectedPath = localStorage.getItem('selectedRoadmap');
+
+          // If no roadmap is selected, show the selection buttons
+          if (!selectedPath) {
+            return `
+              <h2>Choose Your Learning Path</h2>
+              <p>Select a field to view your customized roadmap and track progress.</p>
+              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:20px; margin-top:20px;">
+                <button class="action-btn" onclick="setRoadmap('webdev')">🌐 Web Dev</button>
+                <button class="action-btn" style="background:#1cc88a" onclick="setRoadmap('ds')">📊 Data Science</button>
+                <button class="action-btn" style="background:#f6c23e" onclick="setRoadmap('aiml')">🤖 AI & ML</button>
+              </div>
+            `;
+          }
+
+          // If roadmap is selected, show the checklist
+          const currentData = roadmaps[selectedPath];
+          const completedSteps = JSON.parse(localStorage.getItem(`${selectedPath}_progress`) || "[]");
+          const progressPercent = Math.round((completedSteps.length / currentData.steps.length) * 100);
+
+          return `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2>${currentData.title} Roadmap</h2>
+                <button onclick="clearRoadmap()" style="background:none; border:none; color:var(--primary); cursor:pointer; text-decoration:underline;">Switch Path</button>
+            </div>
+            
+            <p>Your Progress: <b>${progressPercent}%</b></p>
+            <div class="progress-container"><div class="progress-bar" style="width: ${progressPercent}%"></div></div>
+
+            <div style="margin-top: 25px;">
+                ${currentData.steps.map((step, index) => {
+                  const isChecked = completedSteps.includes(index);
+                  return `
+                    <div class="roadmap-step" style="border-left: 4px solid ${isChecked ? 'var(--secondary)' : 'var(--primary)'}">
+                        <input type="checkbox" ${isChecked ? 'checked' : ''} 
+                               onchange="toggleStep('${selectedPath}', ${index})" 
+                               style="width:22px; height:22px; cursor:pointer; margin-right:15px;">
+                        <span style="font-weight:500; color:${isChecked ? '#858796' : '#2e384d'}; text-decoration:${isChecked ? 'line-through' : 'none'};">
+                            ${step}
+                        </span>
+                    </div>
+                  `;
+                }).join('')}
+            </div>
+          `;
+        },
         apt: () => `
           <h2>Aptitude Lab</h2>
           <p>Sharpen your mind with quantitative and verbal tests.</p>
@@ -269,6 +338,9 @@
         }
       };
 
+      // Default load
+      content.innerHTML = pages.dash();
+
       // Navigation handler
       document.getElementById('menu').addEventListener('click', (e) => {
         const link = e.target.closest('a');
@@ -293,6 +365,35 @@
         }
       });
     });
+
+    // GLOBAL HELPER FUNCTIONS
+    function setRoadmap(path) {
+        localStorage.setItem('selectedRoadmap', path);
+        refreshDashboard();
+    }
+
+    function clearRoadmap() {
+        if(confirm("Change your roadmap? Your current progress will be saved.")) {
+            localStorage.removeItem('selectedRoadmap');
+            refreshDashboard();
+        }
+    }
+
+    function toggleStep(path, index) {
+        let completed = JSON.parse(localStorage.getItem(`${path}_progress`) || "[]");
+        if (completed.includes(index)) {
+            completed = completed.filter(i => i !== index);
+        } else {
+            completed.push(index);
+        }
+        localStorage.setItem(`${path}_progress`, JSON.stringify(completed));
+        refreshDashboard();
+    }
+
+    function refreshDashboard() {
+        // Automatically triggers the click to reload content without page refresh
+        document.querySelector('[data-page="dash"]').click();
+    }
 
     function saveProfile() {
       const name = document.getElementById('upName').value;
