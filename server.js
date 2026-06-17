@@ -3,6 +3,10 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const bcrypt = require('bcrypt'); // For password hashing
+const redisClient = require('./redis.config');
+const { cacheMiddleware, invalidateCacheMiddleware } = require('./redis.middleware');
+const { CACHE_KEYS, TTL, deleteCache, deleteCachePattern } = require('./redis.utils');
+
 const app = express();
 const port = 3000;
 
@@ -74,7 +78,7 @@ const companySchema = new mongoose.Schema({
 const Company = mongoose.model('Company', companySchema);
 
 // Create an announcement (Admin only)
-app.post('/announcements', async (req, res) => {
+app.post('/announcements', invalidateCacheMiddleware([CACHE_KEYS.ANNOUNCEMENTS_ALL]), async (req, res) => {
     try {
         const { title, content } = req.body;
         const newAnnouncement = new Announcement({ title, content });
@@ -85,8 +89,8 @@ app.post('/announcements', async (req, res) => {
     }
 });
 
-// Get all announcements for students and admins
-app.get('/announcements', async (req, res) => {
+// Get all announcements for students and admins (with cache)
+app.get('/announcements', cacheMiddleware(CACHE_KEYS.ANNOUNCEMENTS_ALL, TTL.MEDIUM), async (req, res) => {
     try {
         const announcements = await Announcement.find().sort({ createdAt: -1 });
         res.status(200).json(announcements);
@@ -96,7 +100,7 @@ app.get('/announcements', async (req, res) => {
 });
 
 // DELETE an announcement by ID (Admin only)
-app.delete('/announcements/:id', async (req, res) => {
+app.delete('/announcements/:id', invalidateCacheMiddleware([CACHE_KEYS.ANNOUNCEMENTS_ALL]), async (req, res) => {
     const { id } = req.params;
 
     try {
@@ -228,8 +232,8 @@ app.post('/admin/login', async (req, res) => {
     }
 });
 
-// Admin Profile Route
-app.get('/admin/profile', async (req, res) => {
+// Admin Profile Route (with cache)
+app.get('/admin/profile', cacheMiddleware((req) => CACHE_KEYS.ADMIN + (req.query.username || 'unknown'), TTL.LONG), async (req, res) => {
     try {
         const { username } = req.query; // Expect username in query parameters
         
@@ -252,8 +256,8 @@ app.get('/admin/profile', async (req, res) => {
     }
 });
 
-// Get total count of students route
-app.get('/students/count', async (req, res) => {
+// Get total count of students route (with cache)
+app.get('/students/count', cacheMiddleware('students:count', TTL.SHORT), async (req, res) => {
     try {
         const count = await Student.countDocuments(); // Get the count of documents in the collection
         res.status(200).json({ count });
@@ -262,8 +266,8 @@ app.get('/students/count', async (req, res) => {
     }
 });
 
-// Get all students route (if you still want to display details later)
-app.get('/students', async (req, res) => {
+// Get all students route (if you still want to display details later) (with cache)
+app.get('/students', cacheMiddleware(CACHE_KEYS.STUDENT + 'all', TTL.MEDIUM), async (req, res) => {
     try {
         const students = await Student.find({});
         res.status(200).json(students);
@@ -273,7 +277,7 @@ app.get('/students', async (req, res) => {
 });
 
 // DELETE a student by username
-app.delete('/students/:username', async (req, res) => {
+app.delete('/students/:username', invalidateCacheMiddleware([CACHE_KEYS.STUDENT + 'all', 'students:count']), async (req, res) => {
     const username = req.params.username;
     try {
         const deletedStudent = await Student.findOneAndDelete({ username });
@@ -288,7 +292,7 @@ app.delete('/students/:username', async (req, res) => {
 });
 
 // Update student details
-app.put('/students/:username', async (req, res) => {
+app.put('/students/:username', invalidateCacheMiddleware([CACHE_KEYS.STUDENT + 'all', 'students:count']), async (req, res) => {
     const username = req.params.username;
     const { name, email, phone, gender } = req.body; // Ensure these fields exist in the request
 
@@ -371,7 +375,7 @@ app.post('/company/login', async (req, res) => {
 });
 
 // Company Announcement Route
-app.post('/company/announcements', async (req, res) => {
+app.post('/company/announcements', invalidateCacheMiddleware([CACHE_KEYS.ANNOUNCEMENTS_ALL]), async (req, res) => {
     try {
         const { title, content } = req.body;
 
