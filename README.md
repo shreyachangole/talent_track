@@ -99,6 +99,457 @@
 | **React Forms** | react-hook-form | 7.53.0 | Lightweight form state management |
 | **PDF Rendering** | @react-pdf/renderer | 4.0.0 | Certificate/report generation |
 
+---
+
+## 🔐 Role-Based Access Control (RBAC) System
+
+### Overview
+The platform implements an **industry-standard RBAC system** with JWT token-based authentication, granular permission management, and comprehensive audit logging. This ensures secure, scalable, and maintainable authorization across all endpoints.
+
+### Architecture
+```
+┌─────────────────────────────────────────────────────┐
+│            Client Application                       │
+│  (Student/Admin/Company Dashboard)                  │
+└──────────────┬──────────────────────────────────────┘
+               │
+        Send Credentials
+               │
+               ▼
+┌─────────────────────────────────────────────────────┐
+│         Authentication Layer                        │
+│  • Rate limiting (5 attempts / 15 min)              │
+│  • Password validation (bcrypt)                     │
+│  • JWT Token Generation                            │
+│    - Access Token (15 min expiry)                   │
+│    - Refresh Token (7 days expiry)                  │
+└──────────────┬──────────────────────────────────────┘
+               │
+        Return Tokens
+               │
+               ▼
+┌─────────────────────────────────────────────────────┐
+│      Authorization Middleware Chain                  │
+│  1. authenticate() - Verify JWT signature            │
+│  2. authorize() - Check user role                    │
+│  3. requirePermission() - Verify specific perm       │
+│  4. isOwnerOrAdmin() - Resource ownership check      │
+└──────────────┬──────────────────────────────────────┘
+               │
+        Grant/Deny Access
+               │
+               ▼
+┌─────────────────────────────────────────────────────┐
+│      Protected Route Handler                        │
+│  • Execute business logic                           │
+│  • Log action to audit trail                        │
+│  • Return authorized response                       │
+└─────────────────────────────────────────────────────┘
+```
+
+### User Roles & Permissions
+
+#### 1. STUDENT Role
+**Access Level:** User-scoped (can only access own data)
+
+**Permissions:**
+```
+✓ view_own_profile        - Access personal dashboard
+✓ update_own_profile      - Modify profile information
+✓ view_announcements      - Read public announcements
+✓ submit_assessment       - Attempt quizzes/tests
+✓ view_own_results        - Review test scores
+✓ upload_resume           - Submit resume for analysis
+✓ view_companies          - Browse recruiting companies
+✓ apply_to_job            - Submit job applications
+```
+
+**Sample Endpoints:**
+- `POST /auth/student/register` - Create student account
+- `POST /auth/student/login` - Authenticate and get tokens
+- `GET /auth/profile` - Fetch own profile
+- `PUT /auth/profile` - Update personal information
+- `GET /announcements` - View public announcements
+- `POST /assessments/submit` - Submit assessment responses
+
+---
+
+#### 2. ADMIN Role
+**Access Level:** Organization-wide (view and manage all users/resources)
+
+**Permissions:**
+```
+✓ view_all_profiles       - Access all user profiles
+✓ update_user_profiles    - Modify any user's information
+✓ delete_users            - Deactivate/remove users
+✓ create_announcements    - Post system-wide announcements
+✓ delete_announcements    - Remove any announcement
+✓ manage_assessments      - Create/modify assessment questions
+✓ view_all_results        - Access comprehensive test analytics
+✓ view_audit_logs         - Review security & activity logs
+✓ manage_admins           - (SUPERADMIN only) Create new admins
+✓ system_settings         - (SUPERADMIN only) Configure platform
+```
+
+**Sample Endpoints:**
+- `POST /auth/admin/login` - Admin authentication
+- `GET /admin/students` - List all registered students
+- `GET /admin/students/count` - Dashboard statistics
+- `DELETE /admin/students/:userId` - Deactivate student
+- `POST /announcements` - Create announcement
+- `GET /admin/audit-logs` - View security logs
+- `GET /admin/audit-logs?filter=LOGIN_FAILED` - Filter logs
+
+---
+
+#### 3. COMPANY Role
+**Access Level:** Company-scoped (view candidates, manage recruitment)
+
+**Permissions:**
+```
+✓ view_own_profile        - Company profile management
+✓ update_own_profile      - Edit company information
+✓ view_student_profiles   - Search/filter student database
+✓ post_jobs               - Create job postings
+✓ delete_own_jobs         - Remove job listings
+✓ view_applications       - See student applications
+✓ create_announcements    - Post company announcements
+✓ schedule_interviews     - Arrange interview slots
+✓ view_proctored_tests    - Access test results of applicants
+```
+
+**Sample Endpoints:**
+- `POST /auth/company/login` - Company authentication
+- `GET /auth/profile` - Fetch company profile
+- `GET /candidates/search` - Query student database
+- `POST /jobs` - Post new job opening
+- `GET /jobs/:jobId/applications` - View received applications
+- `POST /announcements` - Post company announcement
+
+---
+
+#### 4. SUPERADMIN Role
+**Access Level:** System-wide (all permissions)
+
+**Permissions:**
+```
+✓ * (wildcard)            - All permissions granted
+```
+
+**Use Cases:**
+- Initial system setup
+- Database migrations
+- Emergency data recovery
+- System-wide configurations
+
+---
+
+### JWT Token Structure
+
+#### Access Token Payload
+```json
+{
+  "userId": "507f1f77bcf86cd799439011",
+  "role": "STUDENT",
+  "email": "student@example.com",
+  "type": "access",
+  "iat": 1718880000,
+  "exp": 1718880900
+}
+```
+
+#### Refresh Token Payload
+```json
+{
+  "userId": "507f1f77bcf86cd799439011",
+  "role": "STUDENT",
+  "type": "refresh",
+  "iat": 1718880000,
+  "exp": 1726656000
+}
+```
+
+### Authentication Flow
+
+#### 1. Login Request
+```bash
+POST /auth/student/login
+Content-Type: application/json
+
+{
+  "username": "john_doe",
+  "password": "SecurePassword123!"
+}
+```
+
+#### 2. Login Response (Success)
+```json
+{
+  "success": true,
+  "message": "Student login successful",
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "userId": "507f1f77bcf86cd799439011",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "STUDENT",
+    "department": "Computer Science"
+  }
+}
+```
+
+#### 3. Protected Endpoint Request
+```bash
+GET /auth/profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+#### 4. Token Refresh
+```bash
+POST /auth/token/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Access token refreshed",
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": "15m"
+}
+```
+
+### Security Features
+
+#### 1. **Password Security**
+- ✅ Bcrypt hashing (salt rounds: 10)
+- ✅ Never store plaintext passwords
+- ✅ Passwords excluded from API responses
+- ✅ Password strength validation on registration
+
+#### 2. **Token Security**
+- ✅ JWT signed with HS256 algorithm
+- ✅ Short-lived access tokens (15 minutes)
+- ✅ Refresh token rotation (7 days)
+- ✅ Token invalidation on logout (Redis support)
+- ✅ Environment-based secret keys (change in production!)
+
+#### 3. **Brute Force Protection**
+- ✅ Rate limiting on login endpoints
+- ✅ Account lockout after 5 failed attempts
+- ✅ 15-minute lockout window
+- ✅ Automatic unlock after timeout
+
+#### 4. **Audit Logging**
+All security-relevant events logged to `logs/audit.log`:
+
+```json
+{
+  "timestamp": "2024-06-19T10:30:45.123Z",
+  "action": "LOGIN_SUCCESS",
+  "userId": "507f1f77bcf86cd799439011",
+  "userRole": "STUDENT",
+  "resource": "/auth/student/login",
+  "status": "SUCCESS",
+  "ipAddress": "192.168.1.100",
+  "details": {
+    "email": "student@example.com"
+  }
+}
+```
+
+**Logged Events:**
+- `AUTH_ATTEMPT` - Authentication attempts
+- `LOGIN_SUCCESS` - Successful logins
+- `LOGIN_FAILURE` - Failed login attempts
+- `BRUTE_FORCE_ATTEMPT` - Multiple failed attempts
+- `AUTHZ_DENIED` - Authorization failures
+- `PERM_DENIED` - Permission check failures
+- `ANNOUNCEMENT_CREATED` - Resource creation
+- `PROFILE_UPDATED` - User modifications
+- `STUDENT_DELETED` - User deactivation
+
+#### 5. **Data Access Control**
+- ✅ Students can only access their own profiles
+- ✅ Admins can access all user data
+- ✅ Resource creators can modify their content
+- ✅ Admins can override resource ownership
+- ✅ Owner verification before sensitive operations
+
+### RBAC Middleware Implementation
+
+#### Setup in Express Application
+
+```javascript
+const {
+    authenticate,
+    authorize,
+    requirePermission,
+    isOwnerOrAdmin,
+    rateLimitLogin,
+} = require('./rbac.middleware');
+
+// Public endpoint (no auth required)
+app.get('/announcements', async (req, res) => { ... });
+
+// Authenticated endpoint (any logged-in user)
+app.get('/auth/profile', authenticate, async (req, res) => { ... });
+
+// Role-based endpoint (specific roles only)
+app.get('/admin/students', 
+    authenticate, 
+    authorize('ADMIN', 'SUPERADMIN'),
+    async (req, res) => { ... }
+);
+
+// Permission-based endpoint (fine-grained control)
+app.post('/announcements',
+    authenticate,
+    authorize('ADMIN', 'COMPANY'),
+    requirePermission('create_announcements'),
+    async (req, res) => { ... }
+);
+
+// Owner or Admin endpoint (resource ownership check)
+app.put('/auth/profile',
+    authenticate,
+    isOwnerOrAdmin,
+    async (req, res) => { ... }
+);
+
+// Rate-limited endpoint (brute force protection)
+app.post('/auth/student/login',
+    rateLimitLogin,
+    async (req, res) => { ... }
+);
+```
+
+### Configuration & Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# JWT Configuration (CHANGE IN PRODUCTION!)
+JWT_SECRET=your-super-secret-key-change-in-production
+JWT_REFRESH_SECRET=your-refresh-secret-key-change-in-production
+
+# Server Configuration
+NODE_ENV=development
+PORT=3000
+
+# Database Configuration
+MONGODB_URI=mongodb://localhost:27017/studentDB
+
+# Redis Configuration
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# External APIs
+GOOGLE_GEMINI_API_KEY=your-api-key-here
+```
+
+### Deployment Security Best Practices
+
+1. **Secret Management**
+   ```bash
+   # Use environment variables NEVER commit secrets
+   export JWT_SECRET=$(openssl rand -base64 32)
+   export JWT_REFRESH_SECRET=$(openssl rand -base64 32)
+   ```
+
+2. **HTTPS in Production**
+   ```javascript
+   // Use secure headers middleware
+   const helmet = require('helmet');
+   app.use(helmet());
+   ```
+
+3. **CORS Configuration**
+   ```javascript
+   // Restrict to specific origins
+   app.use(cors({
+     origin: process.env.ALLOWED_ORIGINS?.split(','),
+     credentials: true
+   }));
+   ```
+
+4. **Rate Limiting (Global)**
+   ```javascript
+   const rateLimit = require('express-rate-limit');
+   const limiter = rateLimit({
+     windowMs: 15 * 60 * 1000,
+     max: 100
+   });
+   app.use('/api/', limiter);
+   ```
+
+### Testing RBAC Endpoints
+
+#### Example 1: Student Registration & Login
+```bash
+# Register
+curl -X POST http://localhost:3000/auth/student/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Doe",
+    "email": "john@example.com",
+    "username": "johndoe",
+    "password": "SecurePass123!",
+    "college": "Tech University",
+    "department": "Computer Science"
+  }'
+
+# Login
+curl -X POST http://localhost:3000/auth/student/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "johndoe",
+    "password": "SecurePass123!"
+  }'
+
+# Access protected endpoint
+curl -X GET http://localhost:3000/auth/profile \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+```
+
+#### Example 2: Admin Actions
+```bash
+# Admin Login
+curl -X POST http://localhost:3000/auth/admin/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin_user",
+    "password": "AdminPassword123!"
+  }'
+
+# View all students (Admin only)
+curl -X GET http://localhost:3000/admin/students \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+
+# View audit logs (Admin only)
+curl -X GET http://localhost:3000/admin/audit-logs \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+```
+
+### Troubleshooting
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| `AUTH_TOKEN_MISSING` | No Authorization header | Add `Authorization: Bearer <token>` header |
+| `AUTH_TOKEN_INVALID` | Expired or tampered token | Login again to get new token |
+| `AUTHZ_FORBIDDEN` | Insufficient permissions | Use account with required role |
+| `PERM_DENIED` | Permission check failed | Verify user has required permission |
+| `ACCOUNT_LOCKED` | Too many failed login attempts | Wait 15 minutes or contact admin |
+| `RATE_LIMIT_EXCEEDED` | Rate limit exceeded | Retry after cool-off period |
+
+---
+
 ### Frontend Technologies
 
 | Component | Technology | Purpose |
