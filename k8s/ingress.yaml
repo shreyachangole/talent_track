@@ -1,0 +1,190 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: talent-track-ingress
+  namespace: talent-track-prod
+  annotations:
+    # NGINX Ingress Controller
+    kubernetes.io/ingress.class: "nginx"
+    
+    # SSL/TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Security Headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+    
+    # Rate Limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+    
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://yourdomain.com,https://www.yourdomain.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Content-Type, Authorization"
+    
+    # Compression
+    nginx.ingress.kubernetes.io/enable-compression: "true"
+    nginx.ingress.kubernetes.io/compression-level: "6"
+    
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    
+    # Rate limit specific endpoints
+    nginx.ingress.kubernetes.io/limit-rps-auth: "5"  # Auth endpoints
+
+spec:
+  tls:
+  - hosts:
+    - yourdomain.com
+    - www.yourdomain.com
+    - api.yourdomain.com
+    secretName: talent-track-tls
+
+  rules:
+  - host: yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: talent-track
+            port:
+              number: 3000
+
+  - host: www.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: talent-track
+            port:
+              number: 3000
+
+  - host: api.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: talent-track
+            port:
+              number: 3000
+
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@yourdomain.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+    - dns01:
+        route53:
+          region: us-east-1
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: talent-track-cert
+  namespace: talent-track-prod
+spec:
+  secretName: talent-track-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - yourdomain.com
+  - www.yourdomain.com
+  - api.yourdomain.com
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: talent-track-config
+  namespace: talent-track-prod
+data:
+  nginx.conf: |
+    # Nginx configuration for production
+    upstream talent_track_backend {
+      least_conn;
+      server talent-track:3000 max_fails=3 fail_timeout=30s;
+      keepalive 32;
+    }
+
+    server {
+      listen 80 default_server;
+      server_name _;
+      return 301 https://$host$request_uri;
+    }
+
+    server {
+      listen 443 ssl http2;
+      server_name yourdomain.com www.yourdomain.com;
+
+      # SSL Configuration
+      ssl_certificate /etc/nginx/secrets/tls.crt;
+      ssl_certificate_key /etc/nginx/secrets/tls.key;
+      ssl_protocols TLSv1.2 TLSv1.3;
+      ssl_ciphers HIGH:!aNULL:!MD5;
+      ssl_prefer_server_ciphers on;
+
+      # Security Headers
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+      add_header X-Frame-Options "DENY" always;
+      add_header X-Content-Type-Options "nosniff" always;
+
+      location / {
+        proxy_pass http://talent_track_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+      }
+    }
+
+---
+apiVersion: policy/v1
+kind: NetworkPolicy
+metadata:
+  name: talent-track-ingress-allow
+  namespace: talent-track-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: talent-track
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 3000
